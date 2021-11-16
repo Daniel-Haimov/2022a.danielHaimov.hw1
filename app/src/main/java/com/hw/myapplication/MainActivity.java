@@ -22,6 +22,7 @@ import java.util.Random;
 
 public class MainActivity extends AppCompatActivity {
 
+
     private final int MAX_LIVES = 3;
     private int lives = MAX_LIVES;
 
@@ -72,6 +73,12 @@ public class MainActivity extends AppCompatActivity {
                 findViewById(R.id.panel_IMG_heart_1),
                 findViewById(R.id.panel_IMG_heart_2)
         };
+        //panel_IMG_players = panel_IMG_stones[num_of_rows - 1];
+        panel_IMG_players = new ImageView[]{
+                findViewById(R.id.panel_IMG_player_0),
+                findViewById(R.id.panel_IMG_player_1),
+                findViewById(R.id.panel_IMG_player_2),
+        };
         panel_IMG_stones    = new ImageView[][]{
                 {
                         findViewById(R.id.panel_IMG_stone0_0),
@@ -93,26 +100,7 @@ public class MainActivity extends AppCompatActivity {
                         findViewById(R.id.panel_IMG_stone3_1),
                         findViewById(R.id.panel_IMG_stone3_2),
                 },
-//                {
-//                        findViewById(R.id.panel_IMG_stone4_0),
-//                        findViewById(R.id.panel_IMG_stone4_1),
-//                        findViewById(R.id.panel_IMG_stone4_2),
-//                },
-//                {
-//                        findViewById(R.id.panel_IMG_stone5_0),
-//                        findViewById(R.id.panel_IMG_stone5_1),
-//                        findViewById(R.id.panel_IMG_stone5_2),
-//                },
-//                {
-//                        findViewById(R.id.panel_IMG_stone6_0),
-//                        findViewById(R.id.panel_IMG_stone6_1),
-//                        findViewById(R.id.panel_IMG_stone6_2),
-//                },
-                {
-                        findViewById(R.id.panel_IMG_player_0),
-                        findViewById(R.id.panel_IMG_player_1),
-                        findViewById(R.id.panel_IMG_player_2),
-                },
+                        panel_IMG_players
         };
         panel_BTN_left      = findViewById(R.id.panel_BTN_left );
         panel_BTN_right     = findViewById(R.id.panel_BTN_right);
@@ -122,7 +110,7 @@ public class MainActivity extends AppCompatActivity {
     private void boot_variables() {
         num_of_rows = panel_IMG_stones      .length;
         num_of_cols = panel_IMG_stones[0]   .length;
-        panel_IMG_players = panel_IMG_stones[num_of_rows - 1];
+//        panel_IMG_players = panel_IMG_stones[num_of_rows - 1];
         row_with_stone = true;
         rand = new Random();
         vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
@@ -147,13 +135,13 @@ public class MainActivity extends AppCompatActivity {
     private void initButtons() {
         panel_BTN_left.setOnClickListener(v -> {
             if (player_pos > 0){
-                MovementController(-1);
+                MovementController(Direction.LEFT);
             }
         });
 
         panel_BTN_right.setOnClickListener(v -> {
             if (player_pos < num_of_cols - 1){
-                MovementController(1);
+                MovementController(Direction.RIGHT);
             }
         });
     }
