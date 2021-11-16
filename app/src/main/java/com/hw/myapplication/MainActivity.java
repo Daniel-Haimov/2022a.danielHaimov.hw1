@@ -4,13 +4,10 @@ package com.hw.myapplication;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import android.content.Context;
 import android.graphics.drawable.Drawable;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.VibrationEffect;
-import android.os.Vibrator;
+import android.util.Log;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -22,39 +19,28 @@ import java.util.Random;
 
 public class MainActivity extends AppCompatActivity {
 
+    private final int MAX_LIVES = 3 ;
+    private int lives = MAX_LIVES   ;
 
-    private final int MAX_LIVES = 3;
-    private int lives = MAX_LIVES;
+    private final MyVibrate vibrator = MyVibrate.getMe();
 
-    private final int VIBRATE_DURATION = 500;
-    Vibrator vibrator;
-
-    private int num_of_rows;
-    private int num_of_cols;
-    private boolean row_with_stone;
-    private Random rand;
+    private final int NUM_OF_ROWS = 4 + 1   ; // 1 for players row
+    private final int NUM_OF_COLS = 3       ;
+    private boolean row_with_stone = true   ;
+    private final Random rand = new Random()      ;
     private int player_pos;
 
+    private MyTicker ticker                 ;
+    final Handler handler = new Handler()   ;
+    private Runnable timerRunnable          ;
 
-    final int DELAY = 1000;
-    final Handler handler = new Handler();
-    private Runnable timerRunnable;
+    private final int             STONE_DRAW_ROTATION = 135                                       ;
 
-    private ImageView       panel_IMG_BG        ;
-
-    private ImageView[]     panel_IMG_hearts    ;
-    private ImageView[][]   panel_IMG_stones    ;
-    private ImageView[]     panel_IMG_players   ;
-    private ImageButton     panel_BTN_left      ;
-    private ImageButton     panel_BTN_right     ;
-
-//    private Drawable[]      panel_DRW_icons     ;
-//    private final int       PLAYER_DRAW             = 0     ;
-    private final int       PLAYER_DRAW_ROTATION    = 0     ;
-//    private final int       HIT_DRAW                = 1     ;
-    private final int       HIT_DRAW_ROTATION       = 0     ;
-//    private final int       STONE_DRAW              = 2     ;
-//    private final int       STONE_DRAW_ROTATION     = 135   ;
+    private final ImageView[]     panel_IMG_hearts    = new ImageView[MAX_LIVES]                  ;
+    private final ImageView[][]   panel_IMG_stones    = new ImageView[NUM_OF_ROWS][NUM_OF_COLS]   ;
+    private final ImageView[]     panel_IMG_players   = new ImageView[NUM_OF_COLS]                ;
+    private ImageButton           panel_BTN_left                                                  ;
+    private ImageButton           panel_BTN_right                                                 ;
 
 
     @Override
@@ -62,73 +48,86 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         findViews();
-        Glide.with(MainActivity.this).load(R.drawable.bg).centerCrop().into(panel_IMG_BG);
-        boot_variables();
+        initGame();
     }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        ticker.startTicker();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        ticker.stopTicker();
+    }
+
+    // ~~~ VIEW ~~~
 
     private void findViews() {
-        panel_IMG_BG        = findViewById(R.id.panel_IMG_backGround);
-        panel_IMG_hearts    = new ImageView[] {
-                findViewById(R.id.panel_IMG_heart_0),
-                findViewById(R.id.panel_IMG_heart_1),
-                findViewById(R.id.panel_IMG_heart_2)
-        };
-        //panel_IMG_players = panel_IMG_stones[num_of_rows - 1];
-        panel_IMG_players = new ImageView[]{
-                findViewById(R.id.panel_IMG_player_0),
-                findViewById(R.id.panel_IMG_player_1),
-                findViewById(R.id.panel_IMG_player_2),
-        };
-        panel_IMG_stones    = new ImageView[][]{
-                {
-                        findViewById(R.id.panel_IMG_stone0_0),
-                        findViewById(R.id.panel_IMG_stone0_1),
-                        findViewById(R.id.panel_IMG_stone0_2),
-                },
-                {
-                        findViewById(R.id.panel_IMG_stone1_0),
-                        findViewById(R.id.panel_IMG_stone1_1),
-                        findViewById(R.id.panel_IMG_stone1_2),
-                },
-                {
-                        findViewById(R.id.panel_IMG_stone2_0),
-                        findViewById(R.id.panel_IMG_stone2_1),
-                        findViewById(R.id.panel_IMG_stone2_2),
-                },
-                {
-                        findViewById(R.id.panel_IMG_stone3_0),
-                        findViewById(R.id.panel_IMG_stone3_1),
-                        findViewById(R.id.panel_IMG_stone3_2),
-                },
-                        panel_IMG_players
-        };
-        panel_BTN_left      = findViewById(R.id.panel_BTN_left );
-        panel_BTN_right     = findViewById(R.id.panel_BTN_right);
-
+        setBackGround();
+        findHeartsView();
+        findPlayersView();
+        findGameObjectsView();
+        findButtonsView();
     }
 
-    private void boot_variables() {
-        num_of_rows = panel_IMG_stones      .length;
-        num_of_cols = panel_IMG_stones[0]   .length;
-//        panel_IMG_players = panel_IMG_stones[num_of_rows - 1];
-        row_with_stone = true;
-        rand = new Random();
-        vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-        timerRunnable = () -> {
-            updateClockView();
-            handler.postDelayed(timerRunnable, DELAY);
-        };
-//        panel_DRW_icons = new Drawable[]{
-//                Drawable.createFromPath("drawable/ic_player.xml"),
-//                Drawable.createFromPath("drawable/ic_hit.xml"),
-//                Drawable.createFromPath("drawable/ic_stone.xml"),
-//        };
-        initButtons();
+    private void setBackGround() {
+        ImageView panel_IMG_BG = findViewById(R.id.panel_IMG_backGround);
+        Glide.with(MainActivity.this).load(R.drawable.bg).centerCrop().into(panel_IMG_BG);
+    }
+
+    private void findHeartsView(){
+        for (int i = 0; i < MAX_LIVES; i++) {
+            panel_IMG_hearts[i] =
+                    findViewById(getResources().getIdentifier(
+                            "panel_IMG_heart_" + i,
+                            "id",
+                            getPackageName()));
+        }
+    }
+
+    private void findPlayersView() {
+        for (int i = 0; i < NUM_OF_COLS; i++) {
+            panel_IMG_players[i] =
+                    findViewById(getResources().getIdentifier(
+                            "panel_IMG_player_" + i,
+                            "id",
+                            getPackageName()));
+        }
+    }
+
+    private void findGameObjectsView() {
+        for (int i = 0; i < NUM_OF_ROWS - 1; i++) {
+            for (int j = 0; j < NUM_OF_COLS; j++) {
+                panel_IMG_stones[i][j] =
+                        findViewById(getResources().getIdentifier(
+                                "panel_IMG_stone" + i + "_" + j,
+                                "id",
+                                getPackageName()));
+                Log.d("stone", "i = " + i+ " j = " + j);
+            }
+        }
+        //
+        panel_IMG_stones[NUM_OF_ROWS - 1] = panel_IMG_players;
+    }
+
+    private void findButtonsView() {
+        panel_BTN_left      = findViewById(R.id.panel_BTN_left );
+        panel_BTN_right     = findViewById(R.id.panel_BTN_right);
+    }
+
+    // ~~~ INIT ~~~
+
+    private void initGame() {
         initPlayer();
+        initButtons();
+        initTicker();
     }
 
     private void initPlayer() {
-        player_pos = num_of_cols / 2;
+        player_pos = NUM_OF_COLS / 2;
         fixPlayerRow();
     }
 
@@ -140,15 +139,12 @@ public class MainActivity extends AppCompatActivity {
         });
 
         panel_BTN_right.setOnClickListener(v -> {
-            if (player_pos < num_of_cols - 1){
+            if (player_pos < NUM_OF_COLS - 1){
                 MovementController(Direction.RIGHT);
             }
         });
     }
 
-    /*
-    param direction -> 1 for right; -1 for left;
-     */
     private void MovementController(int direction){
         panel_IMG_players[player_pos    ].setImageResource(R.drawable.ic_player );
         panel_IMG_players[player_pos    ].setVisibility(View.INVISIBLE          );
@@ -156,25 +152,15 @@ public class MainActivity extends AppCompatActivity {
         checkHits();
     }
 
-    @Override
-    protected void onStart() {
-        super.onStart();
-        startTicker();
+    private void initTicker() {
+        timerRunnable = () -> {
+            updateClockView();
+            handler.postDelayed(timerRunnable, MyTicker.DEF_DELAY);
+        };
+        ticker = new MyTicker(handler, timerRunnable);
     }
 
-    private void startTicker() {
-        handler.postDelayed(timerRunnable, DELAY);
-    }
-
-    @Override
-    protected void onStop() {
-        super.onStop();
-        stopTicker();
-    }
-
-    private void stopTicker() {
-        handler.removeCallbacks(timerRunnable);
-    }
+    // ~~~ UPDATE VIEW LOGIC ~~~
 
     private void updateClockView() {
         updateView();
@@ -183,8 +169,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateView() {
-        for (int i = num_of_rows - 1; i > 0; i--)
-            for (int j = 0; j < num_of_cols; j++) {
+        for (int i = NUM_OF_ROWS - 1; i > 0; i--)
+            for (int j = 0; j < NUM_OF_COLS; j++) {
                 Drawable id = panel_IMG_stones[i - 1][j].getDrawable();
                 panel_IMG_stones[i][j].setImageDrawable(id);
                 panel_IMG_stones[i][j].setVisibility(panel_IMG_stones[i - 1][j].getVisibility() );
@@ -194,19 +180,22 @@ public class MainActivity extends AppCompatActivity {
 
     private void checkHits() {
         // If there is object in player position
-        ImageView obj = panel_IMG_stones[num_of_rows-1][player_pos];
+        ImageView obj = panel_IMG_stones[NUM_OF_ROWS -1][player_pos];
         if (obj.getVisibility() == View.VISIBLE) {
-            //TODO
-            // check if obj is stone or coin
-            hitByStone();
+            //TODO check if obj is stone or coin
+            if (obj.getRotation() == STONE_DRAW_ROTATION){
+                hitByStone();
+            }else{
+                hitByCoin();
+            }
         }else
             hitView(false);
     }
 
     private void hitByStone() {
         hitView(true);
-        Toast.makeText(MainActivity.this, "Hit", Toast.LENGTH_SHORT).show();
-        Vibrate();
+        showToast("HIT");
+        vibrator.Vibrate();
         lives--;
         if (lives <= 0)//remove the '=' after changes unlimited lives
             gameOver();
@@ -214,9 +203,19 @@ public class MainActivity extends AppCompatActivity {
             panel_IMG_hearts[lives].setVisibility(View.INVISIBLE);
     }
 
+    private void hitByCoin(){
+        // TODO
+        showToast("COIN");
+    }
+
+    private void showToast(String str) {
+        Toast.makeText(MainActivity.this, str, Toast.LENGTH_SHORT).show();
+    }
+
     private void hitView(boolean hit) {
         if(hit){
-            panel_IMG_players[player_pos].setRotation       (HIT_DRAW_ROTATION      );
+            int HIT_DRAW_ROTATION = 0;
+            panel_IMG_players[player_pos].setRotation       (HIT_DRAW_ROTATION);
             panel_IMG_players[player_pos].setImageResource  (R.drawable.ic_hit_png  );
         }else{
             fixPlayerRow();
@@ -224,6 +223,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void fixPlayerRow() {
+        int PLAYER_DRAW_ROTATION = 0;
         panel_IMG_players[player_pos].setRotation       (PLAYER_DRAW_ROTATION);
         panel_IMG_players[player_pos].setImageResource  (R.drawable.ic_player);
         panel_IMG_players[player_pos].setVisibility     (View.VISIBLE        );
@@ -238,12 +238,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void randomizeFirstRow() {
-        int col = rand.nextInt(num_of_cols);
+        int col = rand.nextInt(NUM_OF_COLS);
         panel_IMG_stones[0][col].setVisibility(View.VISIBLE);
     }
 
     private void InvisibleFirstRow() {
-        for (int i = 0; i < num_of_cols; i++)
+        for (int i = 0; i < NUM_OF_COLS; i++)
             panel_IMG_stones[0][i].setVisibility(View.INVISIBLE);
     }
 
@@ -254,23 +254,5 @@ public class MainActivity extends AppCompatActivity {
             lives = MAX_LIVES;
         }
     }
-
-    private void Vibrate() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createOneShot(VIBRATE_DURATION, VibrationEffect.DEFAULT_AMPLITUDE));
-        } else {
-            //deprecated in API 26
-            vibrator.vibrate(VIBRATE_DURATION);
-        }
-    }
-
-    /*
-    *
-    private void changeVisibility(@NonNull View imageView) {
-        int x = (imageView.getVisibility() + View.INVISIBLE) % View.GONE;
-        imageView.setVisibility(x);
-    }
-    *
-     */
 
 }
